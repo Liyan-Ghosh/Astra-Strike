@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><title>Space Mission - NASA Space Apps</title>
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<style>
+body{margin:0;background:#05060a;color:#e8ecf5;font-family:system-ui,sans-serif;display:flex;flex-direction:column;align-items:center}
+h1{font-size:18px;margin:10px 0 6px;font-weight:600}
+#wrap{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;padding:8px;width:100%;box-sizing:border-box}
+#stage{position:relative;width:1200px;height:600px;max-width:100%;background:#000;border:1px solid #223}
+#stage canvas{position:absolute;left:0;top:0;width:100%;height:100%}
+#text{pointer-events:none}
+#start{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:#000d;cursor:pointer;z-index:5;font-size:20px}
+#ai{width:300px;max-width:100%;background:#0d1020;border:1px solid #223;border-radius:10px;padding:12px;display:flex;flex-direction:column;gap:8px;height:576px}
+#ai h2{margin:0;font-size:15px;color:#7cc4ff}
+#log{flex:1;overflow:auto;font-size:13px;line-height:1.45;display:flex;flex-direction:column;gap:8px}
+.m{padding:8px 10px;border-radius:8px;background:#161b33}.m.u{background:#1f3a5f;align-self:flex-end}
+.m small{opacity:.6}
+#chips button{font-size:12px;margin:2px;padding:4px 8px;border-radius:12px;border:1px solid #345;background:#10162e;color:#cfe;cursor:pointer}
+#row{display:flex;gap:6px}#q{flex:1;padding:8px;border-radius:6px;border:1px solid #345;background:#10162e;color:#fff}
+#row button{padding:8px 12px;border:0;border-radius:6px;background:#2b7fff;color:#fff;cursor:pointer}
+p.hint{font-size:12px;opacity:.7;margin:2px 0 8px}
+</style></head><body>
+<h1>SPACE MISSION - NASA Space Apps Challenge</h1>
+<div id="wrap">
+ <div id="stage">
+  <canvas id="canvas" tabindex="0" oncontextmenu="event.preventDefault()"></canvas>
+  <canvas id="text" width="1200" height="600"></canvas>
+  <div id="start"><div>&#9654; Click to launch mission</div><small style="opacity:.6;margin-top:8px">Enter = continue, Arrow keys = move, Space = shoot</small></div>
+ </div>
+ <div id="ai">
+  <h2>AI Astronomer</h2>
+  <div id="log"><div class="m">Shoot a real space rock in levels 3&#8211;5. I will tell you about it, and you can ask me anything.</div></div>
+  <div id="chips"></div>
+  <div id="row"><input id="q" placeholder="Ask about this object..." autocomplete="off"><button id="send">Ask</button></div>
+  <p class="hint" id="mode"></p>
+ </div>
+</div>
+<script>
+// ---- AI Astronomer config ----
+const PROXY_URL = "";   // e.g. "https://space-ai.YOURNAME.workers.dev" (see worker.js). Empty = offline facts only.
+
+const log=document.getElementById('log'), q=document.getElementById('q'), chips=document.getElementById('chips');
+let cur=null, history=[];
+document.getElementById('mode').textContent = PROXY_URL ? "AI mode: online" : "Offline mode: NASA facts only (set PROXY_URL for AI)";
+function add(t,cls){const d=document.createElement('div');d.className='m '+(cls||'');d.textContent=t;log.appendChild(d);log.scrollTop=log.scrollHeight;return d;}
+// keep game from receiving keys typed in the panel
+['keydown','keyup','keypress'].forEach(e=>q.addEventListener(e,ev=>ev.stopPropagation()));
+
+function setObject(o){
+  cur=o; history=[];
+  add('Discovered: '+o.name+'\n'+o.line1+'\n'+o.line2);
+  chips.innerHTML='';
+  ['Why does it matter for Earth?','Explain like I am 10','What mission visited it?'].forEach(t=>{
+    const b=document.createElement('button');b.textContent=t;b.onclick=()=>ask(t);chips.appendChild(b);});
+}
+async function ask(text){
+  if(!text) return; add(text,'u'); q.value='';
+  if(!cur){add('Shoot a space object first, then ask me about it.');return;}
+  if(!PROXY_URL){add('Offline mode: '+cur.line1+' '+cur.line2);return;}
+  const wait=add('...'); history.push({role:'user',content:text});
+  try{
+    const r=await fetch(PROXY_URL,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({object:cur.name,facts:cur.line1+' '+cur.line2,messages:history.slice(-6)})});
+    const j=await r.json(); const a=j.text||'No answer.'; wait.textContent=a; history.push({role:'assistant',content:a});
+  }catch(e){wait.textContent='AI unavailable. '+cur.line1+' '+cur.line2;}
+}
+document.getElementById('send').onclick=()=>ask(q.value.trim());
+q.addEventListener('keydown',e=>{if(e.key==='Enter')ask(q.value.trim());});
+
+// ---- game loader ----
+var Module={canvas:document.getElementById('canvas'),textCanvas:document.getElementById('text'),
+  onDiscover:setObject,print:console.log,printErr:console.warn};
+document.getElementById('start').onclick=function(){
+  this.remove(); const s=document.createElement('script'); s.src='game.js'; document.body.appendChild(s);
+  document.getElementById('canvas').focus();
+};
+window.addEventListener('keydown',e=>{if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)&&document.activeElement!==q)e.preventDefault();});
+</script></body></html>
